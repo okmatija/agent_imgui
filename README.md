@@ -32,9 +32,15 @@ pulling agent_imgui in:
 - `dear_imgui` — Dear ImGui (the panel renders with it).
 - `imgui_test_engine` — Dear ImGui Test Engine (drives the widgets).
 
-This keeps a single copy of ImGui in the final binary. On non-Windows platforms
-the network providers compile but return an error at call time (only the WinHTTP
-transport is implemented today); `MockProvider` works everywhere.
+This keeps a single copy of ImGui in the final binary. (When built standalone —
+this repo as the top-level CMake project — it fetches matching versions of both
+itself; see `cmake/dependencies.cmake`.)
+
+The LLM providers work on **Windows, Linux and macOS**: HTTPS uses WinHTTP on
+Windows and **libcurl** elsewhere. libcurl ships with macOS; on Linux install
+its development headers (e.g. `libcurl4-openssl-dev`). If libcurl isn't found the
+library still builds, but the network providers return an error at call time;
+`MockProvider` works everywhere.
 
 ## Consuming it (CMake FetchContent)
 
@@ -84,6 +90,34 @@ Runtime (environment):
 
 See [Design](#design) for the architecture and [Widget guidelines](#widget-guidelines)
 for how to write agent-friendly widgets.
+
+## Example app
+
+[`example/`](example/) is a small, portable host built on **SDL3 + SDL_GPU**
+(Windows / Linux / macOS). It shows a full-screen Dear ImGui demo window plus an
+"Agent" panel you can chat in, and it can also run the agent headless. Building
+the repo standalone builds it automatically (it fetches SDL3, Dear ImGui and the
+Test Engine):
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target agent_imgui_example
+```
+
+```
+agent_imgui_example <prompt-file> [options]
+  <prompt-file>      file whose contents are sent as the prompt (positional)
+  --model ID         model alias/id (opus|sonnet|haiku or claude-...)
+  --key-file PATH    file containing the API key (else ANTHROPIC_API_KEY)
+  --timeout SECONDS  max wait for a reply (default 120)
+  --headless         run the prompt, print the reply, and exit (no window/GPU)
+  --window           force windowed mode (default)
+```
+
+```sh
+# Headless one-shot (no window needed):
+./build/example/agent_imgui_example prompt.txt --key-file key.txt --model haiku --headless
+```
 
 ## Design
 

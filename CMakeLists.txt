@@ -5,19 +5,30 @@ cmake_minimum_required(VERSION 3.16)
 
 project(agent_imgui CXX)
 
-# agent_imgui plugs into the *host* application's Dear ImGui build: the panel
-# renders with ImGui and the UI-driving tool uses the ImGui Test Engine. The
-# host project must therefore define the `dear_imgui` and `imgui_test_engine`
-# targets before pulling this in. We deliberately do not fetch our own ImGui so
-# that a single copy is linked into the final application.
+# Standalone build (this repo is the top-level project) vs. embedded in a host
+# project (e.g. MuJoCo Studio) that already provides the ImGui targets.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_agent_imgui_standalone ON)
+else()
+    set(_agent_imgui_standalone OFF)
+endif()
+
+option(AGENT_IMGUI_BUILD_EXAMPLE
+       "Build the portable SDL3 example application"
+       ${_agent_imgui_standalone})
+
+# agent_imgui plugs into the host application's Dear ImGui build: the panel
+# renders with ImGui and the UI-driving tool uses the ImGui Test Engine. If the
+# host hasn't already defined `dear_imgui` and `imgui_test_engine`, fetch and
+# define them ourselves (standalone build). Either way a single copy of ImGui
+# ends up in the final binary.
 if(NOT TARGET dear_imgui OR NOT TARGET imgui_test_engine)
-    message(FATAL_ERROR
-        "agent_imgui requires the parent project to define the 'dear_imgui' and "
-        "'imgui_test_engine' targets before add_subdirectory(agent_imgui). "
-        "See README.md.")
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies.cmake)
 endif()
 
 add_library(agent_imgui STATIC
+    agent_imgui/http.cc
+    agent_imgui/http.h
     agent_imgui/llm_provider.h
     agent_imgui/llm_claude.cc
     agent_imgui/llm_claude.h
@@ -54,8 +65,25 @@ target_link_libraries(agent_imgui
         imgui_test_engine
 )
 
+# HTTPS transport for the Claude/Gemini providers: WinHTTP on Windows, libcurl
+# everywhere else. (HTTPS needs a TLS-capable system library; there is no viable
+# header-only option, so libcurl — universally available — is the minimal pick.)
 if(WIN32)
-    # WinHTTP transport for the Claude/Gemini providers (Windows-only today).
     target_link_libraries(agent_imgui PRIVATE winhttp)
     target_compile_definitions(agent_imgui PRIVATE -D_USE_MATH_DEFINES)
+else()
+    find_package(CURL)
+    if(CURL_FOUND)
+        target_link_libraries(agent_imgui PRIVATE CURL::libcurl)
+        target_compile_definitions(agent_imgui PRIVATE AGENT_IMGUI_HAVE_CURL)
+    else()
+        message(WARNING
+            "libcurl not found: the agent_imgui LLM providers will return an "
+            "error at call time on this platform. Install libcurl development "
+            "headers (e.g. libcurl4-openssl-dev) to enable networking.")
+    endif()
+endif()
+
+if(AGENT_IMGUI_BUILD_EXAMPLE)
+    add_subdirectory(example)
 endif()

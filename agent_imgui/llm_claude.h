@@ -13,7 +13,7 @@ namespace agent_imgui {
 // claude-sonnet-4-6 (switchable at runtime via SetModel / the "/model" command).
 // The API key is read from the
 // ANTHROPIC_API_KEY environment variable (see KeyFromEnv). Transport is WinHTTP
-// on Windows; other platforms return an error result for now (no SDK in-tree).
+// on Windows and libcurl elsewhere (see agent_imgui/http.h).
 //
 // The MVP uses a single, non-streaming request: the conversation is short and
 // the reply (a few sentences) fits comfortably under max_tokens. Streaming is a

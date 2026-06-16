@@ -13,8 +13,8 @@ namespace agent_imgui {
 // :generateContent) with function calling, mirroring ClaudeProvider's own
 // hand-rolled tool-use loop. Defaults to gemini-2.5-flash; switchable via
 // SetModel / the "/model gemini-..." command. The API key is read from
-// GEMINI_API_KEY (or GOOGLE_API_KEY). Transport is WinHTTP on Windows; other
-// platforms return an error result for now (no SDK in-tree).
+// GEMINI_API_KEY (or GOOGLE_API_KEY). Transport is WinHTTP on Windows and
+// libcurl elsewhere (see agent_imgui/http.h).
 class GeminiProvider : public LlmProvider {
  public:
   explicit GeminiProvider(std::string api_key);

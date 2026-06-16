@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "agent_imgui/http.h"
 #include "agent_imgui/llm_provider.h"
 
 namespace agent_imgui {
@@ -273,94 +274,11 @@ std::string GeminiProvider::SetModel(const std::string& id_or_alias) {
 }  // namespace agent_imgui
 
 // ---------------------------------------------------------------------------
-// Platform transport + the tool-use loop, isolated so <windows.h> stays out of
-// the rest of the sources (mirrors llm_claude.cc).
+// The tool-use loop. Platform-independent: HTTP goes through HttpsPost (see
+// agent_imgui/http.{h,cc}).
 // ---------------------------------------------------------------------------
 
-#ifdef _WIN32
-
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#include <winhttp.h>
-
 namespace agent_imgui {
-namespace {
-
-std::wstring Widen(const std::string& s) {
-  std::wstring w;
-  w.reserve(s.size());
-  for (unsigned char c : s) w += static_cast<wchar_t>(c);  // ASCII only.
-  return w;
-}
-
-bool HttpsPost(const std::string& host, const std::string& path,
-               const std::string& headers, const std::string& body, int& status,
-               std::string& response, std::string& err) {
-  status = 0;
-  response.clear();
-  err.clear();
-
-  HINTERNET session = WinHttpOpen(L"agent_imgui/1.0",
-                                  WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                  WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS,
-                                  0);
-  if (!session) { err = "WinHttpOpen failed"; return false; }
-  WinHttpSetTimeouts(session, 60000, 60000, 300000, 300000);
-  HINTERNET connect = WinHttpConnect(session, Widen(host).c_str(),
-                                     INTERNET_DEFAULT_HTTPS_PORT, 0);
-  if (!connect) {
-    err = "WinHttpConnect failed";
-    WinHttpCloseHandle(session);
-    return false;
-  }
-  HINTERNET request = WinHttpOpenRequest(
-      connect, L"POST", Widen(path).c_str(), nullptr, WINHTTP_NO_REFERER,
-      WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
-  if (!request) {
-    err = "WinHttpOpenRequest failed";
-    WinHttpCloseHandle(connect);
-    WinHttpCloseHandle(session);
-    return false;
-  }
-
-  bool ok = false;
-  std::wstring wheaders = Widen(headers);
-  if (WinHttpAddRequestHeaders(request, wheaders.c_str(),
-                               static_cast<DWORD>(-1),
-                               WINHTTP_ADDREQ_FLAG_ADD) &&
-      WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                         const_cast<char*>(body.data()),
-                         static_cast<DWORD>(body.size()),
-                         static_cast<DWORD>(body.size()), 0) &&
-      WinHttpReceiveResponse(request, nullptr)) {
-    DWORD code = 0;
-    DWORD code_size = sizeof(code);
-    WinHttpQueryHeaders(
-        request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-        WINHTTP_HEADER_NAME_BY_INDEX, &code, &code_size, WINHTTP_NO_HEADER_INDEX);
-    status = static_cast<int>(code);
-    for (;;) {
-      DWORD avail = 0;
-      if (!WinHttpQueryDataAvailable(request, &avail) || avail == 0) break;
-      std::string chunk(avail, '\0');
-      DWORD read = 0;
-      if (!WinHttpReadData(request, chunk.data(), avail, &read)) break;
-      chunk.resize(read);
-      response += chunk;
-    }
-    ok = true;
-  } else {
-    err = "WinHttp request failed (code " + std::to_string(GetLastError()) + ")";
-  }
-
-  WinHttpCloseHandle(request);
-  WinHttpCloseHandle(connect);
-  WinHttpCloseHandle(session);
-  return ok;
-}
-
-}  // namespace
 
 LlmResult GeminiProvider::Send(const std::string& system,
                                const std::vector<LlmMessage>& messages,
@@ -479,23 +397,3 @@ LlmResult GeminiProvider::Send(const std::string& system,
 }
 
 }  // namespace agent_imgui
-
-#else  // !_WIN32
-
-namespace agent_imgui {
-
-LlmResult GeminiProvider::Send(const std::string& /*system*/,
-                               const std::vector<LlmMessage>& /*messages*/,
-                               const std::vector<ToolDef>& /*tools*/,
-                               const ToolExecutor& /*exec*/,
-                               const ProgressCallback& /*on_thinking*/) {
-  LlmResult r;
-  r.error =
-      "Gemini transport is only implemented for Windows (WinHTTP) in this "
-      "build.";
-  return r;
-}
-
-}  // namespace agent_imgui
-
-#endif  // _WIN32
