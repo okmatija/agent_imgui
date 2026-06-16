@@ -1,0 +1,1 @@
+Open Widgets > "Combo" and pick the last item in the combo box.

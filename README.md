@@ -13,15 +13,17 @@ It was extracted from [MuJoCo Studio](https://github.com/okmatija/mujoco)
 
 | Unit | Purpose |
 |------|---------|
-| `llm_provider.h` | Provider seam: `LlmProvider`, `LlmResult`, `ToolDef`, `ToolExecutor`. |
-| `llm_claude.{h,cc}` | Anthropic Claude provider (WinHTTP transport, Windows-only). |
-| `llm_gemini.{h,cc}` | Google Gemini provider (WinHTTP transport, Windows-only). |
-| `llm_mock.h` | Deterministic mock provider for tests / headless capture. |
+| `llm_provider.h` | **Provider seam** — implement this to add an LLM: `LlmProvider`, plus `LlmMessage` / `LlmResult` / `ToolDef` / `ToolExecutor` / `ToolResult`. |
+| `http_transport.h` | **Transport seam** — `HttpTransport` + `DefaultHttpTransport()`. The only networking surface; implement it for new platforms (e.g. WASM). |
+| `http_transport.cc` | Built-in transports: WinHTTP (Windows) / libcurl (elsewhere). |
+| `llm_claude.{h,cc}` | Anthropic Claude provider. |
+| `llm_gemini.{h,cc}` | Google Gemini provider. |
+| `llm_mock.h` | Deterministic mock provider — the minimal `LlmProvider` example. |
 | `ui_agent.{h,cc}` | `UiAgent`: routes text to a provider on a worker thread, owns history, slash-commands, tool wiring. |
 | `llm_panel.{h,cc}` | `LlmPanel`: renders the conversation inside a host ImGui window. |
-| `test_runner.{h,cc}` | Runs the model's UI program through the ImGui Test Engine. |
+| `test_runner.{h,cc}` | Runs the model's UI program through the ImGui Test Engine (the `run_ui_program` actuator). |
 | `source_search.{h,cc}` | `GrepSource`: the `grep_source` tool, a substring grep over the host app's sources + model dir. |
-| `system_prompt.md` | The agent's system prompt (editable on disk, hot-reloaded each turn). |
+| `system_prompt.md` | A default system prompt (editable on disk, hot-reloaded each turn). |
 
 ## Dependencies
 
@@ -72,6 +74,77 @@ agent_imgui::LlmPanel panel;    // otherwise MockProvider.
 // on submit:  agent.Ask(user_text);
 ```
 
+## Extending agent_imgui
+
+Two small, independent seams — you usually touch one and ignore the other.
+
+### Add an LLM — the provider seam (`llm_provider.h`)
+
+Subclass `LlmProvider` and implement one method:
+
+```cpp
+class MyProvider : public agent_imgui::LlmProvider {
+ public:
+  agent_imgui::LlmResult Send(
+      const std::string& system,
+      const std::vector<agent_imgui::LlmMessage>& messages,
+      const std::vector<agent_imgui::ToolDef>& tools,
+      const agent_imgui::ToolExecutor& exec,
+      const agent_imgui::ProgressCallback& on_thinking) override {
+    // 1. turn (system, messages, tools) into a request
+    // 2. send it (use an HttpTransport, below)
+    // 3. while the model calls tools: run exec(name, json_args), feed results back
+    // 4. return {ok=true, text=...}  or  {ok=false, error=...}
+  }
+  const char* name() const override { return "mine"; }
+};
+agent.set_provider(std::make_unique<MyProvider>(/* ... */));
+```
+
+Start minimal — ignore `tools`/`exec` and just return text (see `llm_mock.h`,
+the smallest provider). Add tool-calling later; `ClaudeProvider` /
+`GeminiProvider` show the full loop.
+
+Tools are registered on the agent. A tool returns a `ToolResult` (implicitly
+from a string) and may attach images for multimodal models:
+
+```cpp
+agent.set_tools(my_tools,
+    [](const std::string& name, const std::string& json_args)
+        -> agent_imgui::ToolResult {
+      if (name == "do_thing")   return "done";          // text result
+      if (name == "screenshot") {                        // multimodal result
+        agent_imgui::ToolResult r{"here it is"};
+        r.images.push_back({"image/png", base64_png});
+        return r;
+      }
+      return "unknown tool";
+    });
+```
+
+### Use a different network backend — the transport seam (`http_transport.h`)
+
+Networking is one tiny interface, with no LLM knowledge:
+
+```cpp
+struct HttpResponse { bool ok; int status; std::string body; std::string error; };
+class HttpTransport {
+  virtual HttpResponse Post(const std::string& url,
+                            const std::vector<std::string>& headers,
+                            const std::string& body) = 0;
+};
+```
+
+`DefaultHttpTransport()` returns the built-in WinHTTP/libcurl backend. To run
+where those don't reach — e.g. a Dear ImGui app compiled to **WebAssembly** —
+implement `HttpTransport` (over emscripten fetch, a host callback, ...) and hand
+it to a provider:
+
+```cpp
+auto transport = std::make_shared<MyWasmTransport>();
+agent.set_provider(std::make_unique<agent_imgui::ClaudeProvider>(key, transport));
+```
+
 ## Configuration
 
 Compile-time (CMake `target_compile_definitions` on the `agent_imgui` target):
@@ -91,13 +164,19 @@ Runtime (environment):
 See [Design](#design) for the architecture and [Widget guidelines](#widget-guidelines)
 for how to write agent-friendly widgets.
 
-## Example app
+## Example app (optional)
 
-[`example/`](example/) is a small, portable host built on **SDL3 + SDL_GPU**
-(Windows / Linux / macOS). It shows a full-screen Dear ImGui demo window plus an
-"Agent" panel you can chat in, and it can also run the agent headless. Building
-the repo standalone builds it automatically (it fetches SDL3, Dear ImGui and the
-Test Engine):
+[`example/`](example/) is a small, portable host/testbed built on **SDL3 +
+SDL_GPU** (Windows / Linux / macOS). It is **fully separate from the library**:
+everything it needs (SDL3, `stb_image_write`) is fetched inside `example/`, and
+it's gated by the `AGENT_IMGUI_BUILD_EXAMPLE` option (ON only when this repo is
+the top-level project, OFF when embedded). Integrators who just link the
+`agent_imgui` library can ignore this whole directory.
+
+It shows a full-screen Dear ImGui demo window and an "Agent" panel you can chat
+in, wires up the agent's UI tools (`inspect_ui`, `run_ui_program`, `screenshot`),
+and can run the agent headless. Build it (standalone build does so automatically,
+fetching SDL3, Dear ImGui and the Test Engine):
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -109,14 +188,29 @@ agent_imgui_example <prompt-file> [options]
   <prompt-file>      file whose contents are sent as the prompt (positional)
   --model ID         model alias/id (opus|sonnet|haiku or claude-...)
   --key-file PATH    file containing the API key (else ANTHROPIC_API_KEY)
-  --timeout SECONDS  max wait for a reply (default 120)
+  --timeout SECONDS  max wait for the agent (default 120)
   --headless         run the prompt, print the reply, and exit (no window/GPU)
-  --window           force windowed mode (default)
+  --screenshot PATH  offscreen: run the prompt, save a final PNG, and exit
+  --window           interactive window (default)
 ```
 
 ```sh
 # Headless one-shot (no window needed):
 ./build/example/agent_imgui_example prompt.txt --key-file key.txt --model haiku --headless
+
+# Drive the demo UI and save a screenshot of the result:
+./build/example/agent_imgui_example prompt.txt --key-file key.txt --screenshot out.png
+```
+
+### Evals
+
+[`agent_imgui/eval/`](agent_imgui/eval/) holds a set of small demo-window prompts
+and a runner that samples N of them and runs them on M parallel instances of the
+app, writing one screenshot per prompt for manual review:
+
+```sh
+EXE=build/example/agent_imgui_example KEY_FILE=key.txt \
+    bash agent_imgui/eval/run_evals.sh 8 4   # sample 8, run 4 in parallel
 ```
 
 ## Design

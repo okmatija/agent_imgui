@@ -1,0 +1,1 @@
+Open the "Popups & Modal windows" collapsing header.

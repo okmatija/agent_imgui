@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "agent_imgui/http.h"
+#include "agent_imgui/http_transport.h"
 #include "agent_imgui/llm_provider.h"
 
 namespace agent_imgui {
@@ -242,8 +242,10 @@ std::string GeminiProvider::KeyFromEnv() {
   return (k && *k) ? std::string(k) : std::string();
 }
 
-GeminiProvider::GeminiProvider(std::string api_key)
-    : api_key_(std::move(api_key)) {}
+GeminiProvider::GeminiProvider(std::string api_key,
+                               std::shared_ptr<HttpTransport> transport)
+    : transport_(transport ? std::move(transport) : DefaultHttpTransport()),
+      api_key_(std::move(api_key)) {}
 
 std::vector<std::pair<std::string, std::string>> GeminiProvider::Models() {
   return {{"flash", "gemini-2.5-flash"}, {"pro", "gemini-2.5-pro"}};
@@ -274,8 +276,8 @@ std::string GeminiProvider::SetModel(const std::string& id_or_alias) {
 }  // namespace agent_imgui
 
 // ---------------------------------------------------------------------------
-// The tool-use loop. Platform-independent: HTTP goes through HttpsPost (see
-// agent_imgui/http.{h,cc}).
+// The tool-use loop. Platform-independent: HTTP goes through the injected
+// HttpTransport (see agent_imgui/http_transport.h).
 // ---------------------------------------------------------------------------
 
 namespace agent_imgui {
@@ -291,10 +293,11 @@ LlmResult GeminiProvider::Send(const std::string& system,
     return r;
   }
 
-  const std::string host = "generativelanguage.googleapis.com";
-  const std::string path = "/v1beta/models/" + model_ + ":generateContent";
-  const std::string headers =
-      "x-goog-api-key: " + api_key_ + "\r\ncontent-type: application/json";
+  const std::string url = "https://generativelanguage.googleapis.com/v1beta/"
+                          "models/" +
+                          model_ + ":generateContent";
+  const std::vector<std::string> headers = {"x-goog-api-key: " + api_key_,
+                                            "content-type: application/json"};
   const std::string contents = SerializeContents(messages);
   const std::string tools_inner = SerializeTools(tools);
   std::string extra;  // model/function turns appended across the loop.
@@ -308,12 +311,13 @@ LlmResult GeminiProvider::Send(const std::string& system,
     const std::string body =
         BuildRequestBody(system, contents + extra, tools_inner, max_tokens_);
 
-    int status = 0;
-    std::string response, err;
-    if (!HttpsPost(host, path, headers, body, status, response, err)) {
-      r.error = err;
+    const HttpResponse http = transport_->Post(url, headers, body);
+    if (!http.ok) {
+      r.error = http.error;
       return r;
     }
+    const int status = http.status;
+    const std::string& response = http.body;
     if (status != 200) {
       std::string msg = ExtractErrorMessage(response);
       r.error = "HTTP " + std::to_string(status) +
@@ -378,8 +382,9 @@ LlmResult GeminiProvider::Send(const std::string& system,
         std::fprintf(stderr, "\n----- tool_use (turn %d): %s -----\n%s\n", iter,
                      calls[k].name.c_str(), vtrunc(calls[k].args, 2000).c_str());
       }
-      std::string out =
-          exec ? exec(calls[k].name, calls[k].args) : std::string("(no executor)");
+      ToolResult res =
+          exec ? exec(calls[k].name, calls[k].args) : ToolResult("(no executor)");
+      const std::string& out = res.text;  // Gemini tool results are text-only
       if (verbose) {
         std::fprintf(stderr, "----- tool_result: %s -----\n%s\n",
                      calls[k].name.c_str(), vtrunc(out, 2000).c_str());

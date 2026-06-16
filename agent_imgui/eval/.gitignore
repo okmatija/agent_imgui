@@ -1,2 +1,5 @@
-# Transient capture frames (the GIFs themselves are committed for review).
+# Eval output (screenshots, logs)
+out/
+
+# Transient capture frames
 .frames_*/

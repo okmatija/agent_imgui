@@ -1,0 +1,1 @@
+In Widgets > Basic, drag the "drag int" widget to a clearly larger value.

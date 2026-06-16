@@ -1,6 +1,7 @@
 #ifndef AGENT_IMGUI_LLM_GEMINI_H_
 #define AGENT_IMGUI_LLM_GEMINI_H_
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -9,15 +10,19 @@
 
 namespace agent_imgui {
 
+class HttpTransport;
+
 // Talks to the Google Gemini API (generativelanguage.googleapis.com,
 // :generateContent) with function calling, mirroring ClaudeProvider's own
 // hand-rolled tool-use loop. Defaults to gemini-2.5-flash; switchable via
 // SetModel / the "/model gemini-..." command. The API key is read from
 // GEMINI_API_KEY (or GOOGLE_API_KEY). Transport is WinHTTP on Windows and
-// libcurl elsewhere (see agent_imgui/http.h).
+// libcurl elsewhere (see agent_imgui/http_transport.h).
 class GeminiProvider : public LlmProvider {
  public:
-  explicit GeminiProvider(std::string api_key);
+  // `transport` carries the HTTPS requests; defaults to DefaultHttpTransport().
+  explicit GeminiProvider(std::string api_key,
+                          std::shared_ptr<HttpTransport> transport = nullptr);
 
   // Returns GEMINI_API_KEY (or GOOGLE_API_KEY), or "" if unset/empty.
   static std::string KeyFromEnv();
@@ -40,6 +45,7 @@ class GeminiProvider : public LlmProvider {
   std::string Model() const override { return model_; }
 
  private:
+  std::shared_ptr<HttpTransport> transport_;
   std::string api_key_;
   std::string model_ = "gemini-2.5-flash";
   int max_tokens_ = 8192;

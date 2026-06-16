@@ -27,8 +27,8 @@ if(NOT TARGET dear_imgui OR NOT TARGET imgui_test_engine)
 endif()
 
 add_library(agent_imgui STATIC
-    agent_imgui/http.cc
-    agent_imgui/http.h
+    agent_imgui/http_transport.cc
+    agent_imgui/http_transport.h
     agent_imgui/llm_provider.h
     agent_imgui/llm_claude.cc
     agent_imgui/llm_claude.h

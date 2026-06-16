@@ -1,1 +1,1 @@
-Set gravity.y to 10
+Open the "Configuration" collapsing header.

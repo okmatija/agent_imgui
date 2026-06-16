@@ -1,0 +1,1 @@
+Open the "Inputs & Focus" collapsing header.

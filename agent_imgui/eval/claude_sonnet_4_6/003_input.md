@@ -1,0 +1,1 @@
+Open the "Layout & Scrolling" collapsing header.

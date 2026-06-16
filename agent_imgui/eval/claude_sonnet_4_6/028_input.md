@@ -1,0 +1,1 @@
+From the menu bar, open the Tools menu and click "About Dear ImGui".

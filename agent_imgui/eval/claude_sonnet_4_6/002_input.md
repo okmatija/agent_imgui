@@ -1,0 +1,1 @@
+Open the "Widgets" collapsing header.

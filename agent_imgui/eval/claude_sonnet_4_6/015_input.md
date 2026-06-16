@@ -1,0 +1,1 @@
+Open Widgets > "Color/Picker Widgets".

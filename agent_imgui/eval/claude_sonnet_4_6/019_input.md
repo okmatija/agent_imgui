@@ -1,0 +1,1 @@
+Open Widgets > "Text Input" and type "hello world" into the first text box.

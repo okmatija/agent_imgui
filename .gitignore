@@ -5,3 +5,6 @@ cmake-build-*/
 
 # Transient capture frames
 .frames_*/
+
+# stray Dear ImGui layout files
+imgui.ini

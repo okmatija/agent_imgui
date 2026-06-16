@@ -1,0 +1,1 @@
+In Widgets > Basic, tick the checkbox labelled "checkbox".

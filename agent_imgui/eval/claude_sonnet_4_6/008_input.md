@@ -1,0 +1,1 @@
+In Widgets > Basic, click the button labelled "Button".

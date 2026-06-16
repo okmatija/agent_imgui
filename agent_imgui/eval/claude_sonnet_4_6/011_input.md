@@ -1,0 +1,1 @@
+In Widgets > Basic, open the combo and choose "Banana".

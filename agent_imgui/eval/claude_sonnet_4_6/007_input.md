@@ -1,0 +1,1 @@
+In the Widgets section, open the "Basic" tree node.

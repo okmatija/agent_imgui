@@ -21,14 +21,33 @@ struct ToolDef {
   std::string input_schema;
 };
 
-// Executes a tool call and returns a short human-readable result string that is
-// fed back to the model. `json_args` is the raw JSON arguments object the model
-// produced. The provider runs the tool-use loop internally and invokes this for
-// each call; implementations should be quick and side-effecting (e.g. open a
-// window) -- this is the "as if clicking the button" seam.
+// An image a tool hands back to a multimodal model (e.g. a screenshot).
+struct ToolImage {
+  std::string media_type;   // e.g. "image/png"
+  std::string data_base64;  // base64-encoded image bytes
+};
+
+// What a tool call returns to the model: a short human-readable text result and,
+// optionally, images (only used by multimodal providers; ignored otherwise). It
+// implicitly constructs from a string, so a text-only tool can just
+// `return "...";`.
+struct ToolResult {
+  std::string text;
+  std::vector<ToolImage> images;
+
+  ToolResult() = default;
+  ToolResult(std::string t) : text(std::move(t)) {}  // NOLINT(runtime/explicit)
+  ToolResult(const char* t) : text(t) {}             // NOLINT(runtime/explicit)
+};
+
+// Executes a tool call and returns the result fed back to the model. `json_args`
+// is the raw JSON arguments object the model produced. The provider runs the
+// tool-use loop internally and invokes this for each call; implementations
+// should be quick and side-effecting (e.g. open a window) -- this is the "as if
+// clicking the button" seam.
 using ToolExecutor =
-    std::function<std::string(const std::string& name,
-                              const std::string& json_args)>;
+    std::function<ToolResult(const std::string& name,
+                             const std::string& json_args)>;
 
 // Optional progress callback, invoked on the worker thread as extended-thinking
 // accumulates across the tool-use loop. Lets a UI show partial reasoning (e.g.

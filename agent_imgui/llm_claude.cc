@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "agent_imgui/http.h"
+#include "agent_imgui/http_transport.h"
 #include "agent_imgui/llm_provider.h"
 
 namespace agent_imgui {
@@ -295,8 +295,10 @@ std::vector<std::pair<std::string, std::string>> ClaudeProvider::Models() {
           {"haiku", "claude-haiku-4-5"}};
 }
 
-ClaudeProvider::ClaudeProvider(std::string api_key)
-    : api_key_(std::move(api_key)) {}
+ClaudeProvider::ClaudeProvider(std::string api_key,
+                               std::shared_ptr<HttpTransport> transport)
+    : transport_(transport ? std::move(transport) : DefaultHttpTransport()),
+      api_key_(std::move(api_key)) {}
 
 std::string ClaudeProvider::SetModel(const std::string& id_or_alias) {
   // Normalize: strip whitespace, lowercase.
@@ -327,8 +329,8 @@ std::string ClaudeProvider::SetModel(const std::string& id_or_alias) {
 }  // namespace agent_imgui
 
 // ---------------------------------------------------------------------------
-// The tool-use loop. Platform-independent: HTTP goes through HttpsPost (see
-// agent_imgui/http.{h,cc}).
+// The tool-use loop. Platform-independent: HTTP goes through the injected
+// HttpTransport (see agent_imgui/http_transport.h).
 // ---------------------------------------------------------------------------
 
 namespace agent_imgui {
@@ -344,9 +346,9 @@ LlmResult ClaudeProvider::Send(const std::string& system,
     return r;
   }
 
-  const std::string headers = "x-api-key: " + api_key_ + "\r\n" +
-                              "anthropic-version: 2023-06-01\r\n" +
-                              "content-type: application/json";
+  const std::vector<std::string> headers = {
+      "x-api-key: " + api_key_, "anthropic-version: 2023-06-01",
+      "content-type: application/json"};
   const std::string convo = SerializeMessages(messages);
   const std::string tools_inner = SerializeTools(tools);
   std::string extra;  // assistant/tool_result turns appended across the loop.
@@ -367,14 +369,15 @@ LlmResult ClaudeProvider::Send(const std::string& system,
         BuildRequestBody(model_, max_tokens_, adaptive_thinking_, system,
                          convo + extra, tools_inner);
 
-    int status = 0;
-    std::string response, err;
-    if (!HttpsPost("api.anthropic.com", "/v1/messages", headers, body, status,
-                   response, err)) {
-      r.error = err;
+    const HttpResponse http = transport_->Post(
+        "https://api.anthropic.com/v1/messages", headers, body);
+    if (!http.ok) {
+      r.error = http.error;
       r.thinking = thinking_acc;  // surface reasoning so far on failure
       return r;
     }
+    const int status = http.status;
+    const std::string& response = http.body;
     if (status != 200) {
       std::string msg = ExtractErrorMessage(response);
       r.error = "HTTP " + std::to_string(status) +
@@ -434,16 +437,36 @@ LlmResult ClaudeProvider::Send(const std::string& system,
         std::fprintf(stderr, "\n----- tool_use (turn %d): %s -----\n%s\n", iter,
                      calls[k].name.c_str(), vtrunc(calls[k].input, 2000).c_str());
       }
-      std::string out =
-          exec ? exec(calls[k].name, calls[k].input) : std::string("(no executor)");
+      ToolResult out =
+          exec ? exec(calls[k].name, calls[k].input) : ToolResult("(no executor)");
       if (verbose) {
-        std::fprintf(stderr, "----- tool_result: %s -----\n%s\n",
-                     calls[k].name.c_str(), vtrunc(out, 2000).c_str());
+        std::fprintf(stderr, "----- tool_result: %s -----\n%s%s\n",
+                     calls[k].name.c_str(), vtrunc(out.text, 2000).c_str(),
+                     out.images.empty() ? "" : " [+image]");
+      }
+      // A text-only result is a plain string; with images the content becomes a
+      // block array (text + base64 image blocks) for multimodal models.
+      std::string content;
+      if (out.images.empty()) {
+        content = JsonString(out.text);
+      } else {
+        content = "[";
+        if (!out.text.empty()) {
+          content += "{\"type\":\"text\",\"text\":" + JsonString(out.text) + "},";
+        }
+        for (size_t j = 0; j < out.images.size(); ++j) {
+          if (j) content += ",";
+          content +=
+              "{\"type\":\"image\",\"source\":{\"type\":\"base64\","
+              "\"media_type\":" +
+              JsonString(out.images[j].media_type) +
+              ",\"data\":" + JsonString(out.images[j].data_base64) + "}}";
+        }
+        content += "]";
       }
       if (k) results += ",";
       results += "{\"type\":\"tool_result\",\"tool_use_id\":" +
-                 JsonString(calls[k].id) + ",\"content\":" + JsonString(out) +
-                 "}";
+                 JsonString(calls[k].id) + ",\"content\":" + content + "}";
     }
     results += "]";
     extra += ",{\"role\":\"user\",\"content\":" + results + "}";

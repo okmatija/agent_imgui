@@ -1,0 +1,1 @@
+In Widgets > Basic, set the "slider float" to its maximum.

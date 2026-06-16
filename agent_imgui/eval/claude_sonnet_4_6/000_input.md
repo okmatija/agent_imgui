@@ -1,1 +1,1 @@
-Turn on segmentation rendering, contact forces and points
+Open the "Help" collapsing header in the demo window.

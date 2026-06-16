@@ -1,6 +1,7 @@
 #ifndef AGENT_IMGUI_LLM_CLAUDE_H_
 #define AGENT_IMGUI_LLM_CLAUDE_H_
 
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -8,6 +9,8 @@
 #include "agent_imgui/llm_provider.h"
 
 namespace agent_imgui {
+
+class HttpTransport;
 
 // Talks to the Anthropic Messages API (POST /v1/messages). Defaults to model
 // claude-sonnet-4-6 (switchable at runtime via SetModel / the "/model" command).
@@ -20,7 +23,10 @@ namespace agent_imgui {
 // later refinement noted in the design doc.
 class ClaudeProvider : public LlmProvider {
  public:
-  explicit ClaudeProvider(std::string api_key);
+  // `transport` carries the HTTPS requests; defaults to DefaultHttpTransport().
+  // Inject your own (e.g. a WebAssembly transport) to network differently.
+  explicit ClaudeProvider(std::string api_key,
+                          std::shared_ptr<HttpTransport> transport = nullptr);
 
   // Returns the ANTHROPIC_API_KEY value, or "" if unset/empty.
   static std::string KeyFromEnv();
@@ -44,6 +50,7 @@ class ClaudeProvider : public LlmProvider {
   std::string Model() const override { return model_; }
 
  private:
+  std::shared_ptr<HttpTransport> transport_;
   std::string api_key_;
   std::string model_ = "claude-sonnet-4-6";
   bool adaptive_thinking_ = true;  // on for the opus/sonnet 4.6+ family

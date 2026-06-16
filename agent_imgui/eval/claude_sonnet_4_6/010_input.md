@@ -1,0 +1,1 @@
+In Widgets > Basic, select the radio button "radio b".

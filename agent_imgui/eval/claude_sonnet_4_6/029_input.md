@@ -1,0 +1,1 @@
+From the menu bar, open the Examples menu and enable "Console".

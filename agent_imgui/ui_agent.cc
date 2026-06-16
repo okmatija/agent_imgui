@@ -277,9 +277,9 @@ void UiAgent::Ask(const std::string& question) {
   // Guard the executor: once cancelled, drop any further tool actions so nothing
   // from this abandoned request touches the UI.
   ToolExecutor guarded = [exec, pending](const std::string& name,
-                                         const std::string& args) -> std::string {
+                                         const std::string& args) -> ToolResult {
     if (pending->cancelled.load()) return "(request cancelled)";
-    return exec ? exec(name, args) : std::string();
+    return exec ? exec(name, args) : ToolResult();
   };
   // Stream thinking-so-far into the shared state for Cancel() to surface.
   ProgressCallback on_thinking = [pending](const std::string& thinking) {

@@ -1,0 +1,1 @@
+Open Widgets > "Tabs" and switch to a tab other than the first.

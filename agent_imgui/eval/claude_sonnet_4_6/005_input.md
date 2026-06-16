@@ -1,0 +1,1 @@
+Open the "Tables & Columns" collapsing header.

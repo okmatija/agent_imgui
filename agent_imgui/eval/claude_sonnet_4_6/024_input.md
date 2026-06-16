@@ -1,0 +1,1 @@
+In the "Tables & Columns" section, click the "Expand all" button.
