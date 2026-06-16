@@ -17,7 +17,6 @@ A small, portable reference host lives in [`example/`](example/) (SDL3 + SDL_GPU
 | `http_transport.cc` | Built-in transports: WinHTTP (Windows) / libcurl (elsewhere). |
 | `llm_claude.{h,cc}` | Anthropic Claude provider. |
 | `llm_gemini.{h,cc}` | Google Gemini provider. |
-| `llm_mock.h` | Deterministic mock provider — the minimal `LlmProvider` example. |
 | `ui_agent.{h,cc}` | `UiAgent`: routes text to a provider on a worker thread, owns history, slash-commands, tool wiring. |
 | `llm_panel.{h,cc}` | `LlmPanel`: renders the conversation inside a host ImGui window. |
 | `test_runner.{h,cc}` | Runs the model's UI program through the ImGui Test Engine (the `run_ui_program` actuator). |
@@ -40,8 +39,7 @@ itself; see `cmake/dependencies.cmake`.)
 The LLM providers work on **Windows, Linux and macOS**: HTTPS uses WinHTTP on
 Windows and **libcurl** elsewhere. libcurl ships with macOS; on Linux install
 its development headers (e.g. `libcurl4-openssl-dev`). If libcurl isn't found the
-library still builds, but the network providers return an error at call time;
-`MockProvider` works everywhere.
+library still builds, but the network providers return an error at call time.
 
 ## Consuming it (CMake FetchContent)
 
@@ -67,8 +65,8 @@ Then, from the host code:
 #include "agent_imgui/ui_agent.h"
 #include "agent_imgui/llm_panel.h"
 
-agent_imgui::UiAgent agent;     // ClaudeProvider if ANTHROPIC_API_KEY is set,
-agent_imgui::LlmPanel panel;    // otherwise MockProvider.
+agent_imgui::UiAgent agent;     // defaults to Claude (uses ANTHROPIC_API_KEY)
+agent_imgui::LlmPanel panel;
 // each frame: agent.Poll();  panel.Render(agent);
 // on submit:  agent.Ask(user_text);
 ```
@@ -100,9 +98,8 @@ class MyProvider : public agent_imgui::LlmProvider {
 agent.set_provider(std::make_unique<MyProvider>(/* ... */));
 ```
 
-Start minimal — ignore `tools`/`exec` and just return text (see `llm_mock.h`,
-the smallest provider). Add tool-calling later; `ClaudeProvider` /
-`GeminiProvider` show the full loop.
+Start minimal — ignore `tools`/`exec` and just return `{ok=true, text=...}`. Add
+tool-calling later; `ClaudeProvider` / `GeminiProvider` show the full loop.
 
 Tools are registered on the agent. A tool returns a `ToolResult` (implicitly
 from a string) and may attach images for multimodal models:

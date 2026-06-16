@@ -79,7 +79,7 @@ class LlmProvider {
                          const ToolExecutor& exec,
                          const ProgressCallback& on_thinking = {}) = 0;
 
-  // Short name for the status line (e.g. "Claude", "mock").
+  // Short name for the status line (e.g. "Claude").
   virtual const char* name() const = 0;
 
   // Switch the active model. `id_or_alias` is a friendly alias ("opus",

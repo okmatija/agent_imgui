@@ -34,7 +34,6 @@ add_library(agent_imgui STATIC
     agent_imgui/llm_claude.h
     agent_imgui/llm_gemini.cc
     agent_imgui/llm_gemini.h
-    agent_imgui/llm_mock.h
     agent_imgui/llm_panel.cc
     agent_imgui/llm_panel.h
     agent_imgui/source_search.cc

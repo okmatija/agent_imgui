@@ -13,7 +13,6 @@
 
 #include "agent_imgui/llm_claude.h"
 #include "agent_imgui/llm_gemini.h"
-#include "agent_imgui/llm_mock.h"
 #include "agent_imgui/llm_provider.h"
 
 #ifndef AGENT_IMGUI_SOURCE_DIR
@@ -58,13 +57,10 @@ std::string LoadSystemPrompt() {
 
 UiAgent::UiAgent() {
   system_ = LoadSystemPrompt();
-
-  std::string key = ClaudeProvider::KeyFromEnv();
-  if (!key.empty()) {
-    provider_ = std::make_shared<ClaudeProvider>(std::move(key));
-  } else {
-    provider_ = std::make_shared<MockProvider>();
-  }
+  // Default to Claude. If ANTHROPIC_API_KEY is unset it still constructs and
+  // reports the missing key at call time; inject another provider with
+  // set_provider().
+  provider_ = std::make_shared<ClaudeProvider>(ClaudeProvider::KeyFromEnv());
   provider_name_ = provider_->name();
 }
 

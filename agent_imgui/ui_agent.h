@@ -17,7 +17,7 @@ namespace agent_imgui {
 // conversation. Networking happens on a detached worker thread; the UI thread
 // calls Poll() once per frame to fold a finished reply into the history. For
 // deterministic headless capture, set_synchronous(true) makes Ask() block
-// inline (used with the mock provider).
+// inline.
 //
 // This is the MVP seam from LLM_INTEGRATION_DESIGN.md: text in, text out, no
 // tools yet. The provider abstraction and conversation model are what the Test
@@ -31,7 +31,7 @@ class UiAgent {
     std::string model;     // model id that produced the reply (assistant only).
   };
 
-  UiAgent();  // ClaudeProvider if ANTHROPIC_API_KEY is set, else MockProvider.
+  UiAgent();  // Defaults to ClaudeProvider (reports a missing key at call time).
   ~UiAgent() = default;
 
   UiAgent(const UiAgent&) = delete;
