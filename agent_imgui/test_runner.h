@@ -24,6 +24,10 @@ namespace agent_imgui {
 // thread regardless of who asked.
 class TestRunner {
  public:
+  // Playback speed for Replay(): kFast teleports the cursor (instant), while
+  // kNormal / kCinematic animate it so a human can follow along.
+  enum class Speed { kFast, kNormal, kCinematic };
+
   TestRunner() = default;
   ~TestRunner();
 
@@ -45,8 +49,27 @@ class TestRunner {
   void PostSwap();
 
   // Enqueues a UI program. `json_args` is the run_ui_program arguments object,
-  // i.e. {"ops":[ ... ]}. Returns the number of ops parsed. Thread-safe.
+  // i.e. {"ops":[ ... ]}. Returns the number of ops parsed. While recording is
+  // on (the default) the ops are also appended to the recording. Thread-safe.
   int Run(const std::string& json_args);
+
+  // Replays an op-program for a human to watch: runs at `speed` (kNormal/
+  // kCinematic animate the cursor), does NOT add to the recording, and restores
+  // the previous run speed once it finishes. Returns the number of ops. The
+  // ops reproduce the actions from whatever state the UI is in now -- see the
+  // recording/replay notes in the README for how robust that is. Thread-safe.
+  int Replay(const std::string& json_args, Speed speed = Speed::kNormal);
+
+  // Op recording. While on (default), Run()'s ops are appended to an internal
+  // log so the program "so far" is available even if the prompt that produced it
+  // was cancelled. Replay() ops are never recorded.
+  void set_recording(bool on) { recording_ = on; }
+  bool recording() const { return recording_; }
+  // The recorded ops as a run_ui_program argument object ({"ops":[...]}), or ""
+  // if nothing has been recorded. Feed it to Run()/Replay() to repeat it, or
+  // save it to a file to replay later. Thread-safe.
+  std::string GetRecording();
+  void ClearRecording();
 
   // Lists the items currently visible on screen (grouped by window, with their
   // labels), so the agent can confirm what actually opened / find a target.
@@ -76,11 +99,15 @@ class TestRunner {
     bool gather = false;
     std::string payload;  // ops-array JSON for a program job
     std::shared_ptr<GatherResult> result;  // set for gather jobs
+    int run_speed = -1;   // >=0: ImGuiTestRunSpeed to set for this job (Replay)
   };
 
   static void TestFuncThunk(ImGuiTestContext* ctx);
   void Execute(ImGuiTestContext* ctx, const std::string& ops_json);
   void DoGather(ImGuiTestContext* ctx, const std::shared_ptr<GatherResult>& out);
+  // Shared body of Run()/Replay(): queues `json_args`, optionally recording its
+  // ops and/or overriding the run speed (-1 = leave as-is).
+  int Enqueue(const std::string& json_args, bool record, int run_speed);
 
   ImGuiTestEngine* engine_ = nullptr;
   ImGuiTest* test_ = nullptr;
@@ -89,6 +116,10 @@ class TestRunner {
   std::mutex mu_;
   std::vector<Job> jobs_;  // pending work (UI thread drains in PostSwap)
   Job running_job_;        // the job the currently-queued test is executing
+
+  bool recording_ = true;            // append Run() ops to recorded_
+  std::vector<std::string> recorded_;  // recorded op-object JSON strings
+  int saved_speed_ = -1;             // ConfigRunSpeed to restore after a Replay
 };
 
 }  // namespace agent_imgui

@@ -133,6 +133,8 @@ struct Args {
   std::string model;
   std::string key_file;
   std::string screenshot_path;  // non-empty => offscreen eval mode
+  std::string record_file;      // non-empty => write the recorded ops here
+  std::string replay_file;      // non-empty => replay these ops (no agent)
   double timeout_s = 120.0;
   bool headless = false;
   bool help = false;
@@ -147,6 +149,8 @@ void Usage(const char* argv0) {
       "  --timeout SECONDS    max wait for the agent (default 120)\n"
       "  --headless           text-only: run prompt, print reply, exit (no GPU)\n"
       "  --screenshot PATH    offscreen: run prompt, save final PNG to PATH, exit\n"
+      "  --record PATH        save the agent's recorded ops (a replayable program)\n"
+      "  --replay FILE        replay an ops file in a window at human speed (no agent)\n"
       "  --window             interactive window (default)\n",
       argv0);
 }
@@ -165,6 +169,8 @@ bool ParseArgs(int argc, char** argv, Args& a, std::string& err) {
     else if (s == "--model") { if (!value(a.model)) return false; }
     else if (s == "--key-file") { if (!value(a.key_file)) return false; }
     else if (s == "--screenshot") { if (!value(a.screenshot_path)) return false; }
+    else if (s == "--record") { if (!value(a.record_file)) return false; }
+    else if (s == "--replay") { if (!value(a.replay_file)) return false; }
     else if (s == "--timeout") {
       std::string t;
       if (!value(t)) return false;
@@ -498,7 +504,18 @@ int RunHeadless(const Args& a, const std::string& prompt) {
 }
 
 int RunGui(const Args& a, const std::string& prompt) {
-  const bool eval = !a.screenshot_path.empty();  // offscreen one-shot
+  const bool replay = !a.replay_file.empty();          // play an ops file, no agent
+  const bool eval = !a.screenshot_path.empty() && !replay;  // offscreen one-shot
+
+  std::string replay_ops;
+  if (replay) {
+    replay_ops = Trim(ReadFile(a.replay_file));
+    if (replay_ops.empty()) {
+      std::fprintf(stderr, "error: empty or unreadable ops file '%s'\n",
+                   a.replay_file.c_str());
+      return 2;
+    }
+  }
 
   SDL_SetMainReady();
   if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -535,7 +552,10 @@ int RunGui(const Args& a, const std::string& prompt) {
   ApplyProvider(agent, a, ResolveKey(a, key_err));
 
   static char input[1 << 14];
-  if (!prompt.empty()) {
+  if (replay) {
+    // No agent: just play the recorded ops at human speed for the user to watch.
+    runner.Replay(replay_ops, agent_imgui::TestRunner::Speed::kNormal);
+  } else if (!prompt.empty()) {
     std::snprintf(input, sizeof(input), "%s", prompt.c_str());
     agent.Ask(prompt);
   }
@@ -568,7 +588,7 @@ int RunGui(const Args& a, const std::string& prompt) {
     ImGui::SetWindowPos("Dear ImGui Demo", vp->WorkPos, ImGuiCond_Always);
     ImGui::SetWindowSize("Dear ImGui Demo", vp->WorkSize, ImGuiCond_Always);
 
-    if (!eval) {  // interactive chat panel
+    if (!eval && !replay) {  // interactive chat panel
       ImGui::SetNextWindowSize(ImVec2(520, 380), ImGuiCond_FirstUseEver);
       if (ImGui::Begin("Agent")) {
         ImGui::TextDisabled("provider: %s   model: %s",
@@ -622,6 +642,20 @@ int RunGui(const Args& a, const std::string& prompt) {
   }
 
   if (agent.busy()) agent.Cancel();
+
+  // Save the agent's recorded ops (a replayable program) if requested.
+  if (!a.record_file.empty()) {
+    const std::string ops = runner.GetRecording();
+    if (ops.empty()) {
+      std::fprintf(stderr, "note: no ops were recorded\n");
+    } else if (WriteFile(a.record_file, ops)) {
+      std::fprintf(stderr, "wrote ops to %s\n", a.record_file.c_str());
+    } else {
+      std::fprintf(stderr, "error: failed to write %s\n", a.record_file.c_str());
+      exit_code = 5;
+    }
+  }
+
   SDL_WaitForGPUIdle(r.gpu);
   runner.Stop();
   ImGui_ImplSDLGPU3_Shutdown();
@@ -644,6 +678,15 @@ int main(int argc, char** argv) {
     return 2;
   }
   if (args.help) { Usage(argv[0]); return 0; }
+
+  // Replay mode needs no prompt, key, or agent: just play an ops file in a window.
+  if (!args.replay_file.empty()) {
+    if (args.headless) {
+      std::fprintf(stderr, "error: --replay needs a window (not --headless)\n");
+      return 2;
+    }
+    return RunGui(args, /*prompt=*/"");
+  }
 
   std::string prompt;
   if (!args.prompt_file.empty()) {

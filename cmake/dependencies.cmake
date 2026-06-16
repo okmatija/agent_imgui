@@ -1,9 +1,8 @@
 # Provides the `dear_imgui` and `imgui_test_engine` targets the agent_imgui
 # library links against, for standalone builds. A host project that already
-# defines these targets (e.g. MuJoCo Studio) supplies its own and this file is
-# never included. Versions match MuJoCo Studio's so the library code (extracted
-# from it) stays compatible; this ImGui (1.92.x) ships the SDL3 + SDL_GPU
-# backends the example uses.
+# defines these targets supplies its own and this file is never included. This
+# pins a known-good ImGui (1.92.x) that ships the SDL3 + SDL_GPU backends the
+# example uses.
 
 include(FetchContent)
 

@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.16)
 project(agent_imgui CXX)
 
 # Standalone build (this repo is the top-level project) vs. embedded in a host
-# project (e.g. MuJoCo Studio) that already provides the ImGui targets.
+# project that already provides the ImGui targets.
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(_agent_imgui_standalone ON)
 else()

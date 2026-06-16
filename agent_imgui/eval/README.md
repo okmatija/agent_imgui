@@ -19,22 +19,32 @@ runs against `claude-sonnet-4-6`.
 
 ## Run
 
-[`run_evals.sh`](run_evals.sh) samples N prompts and runs them on M parallel
-instances of the example app, writing one **final screenshot per prompt** for
-manual verification:
+[`run_evals.py`](run_evals.py) (portable, standard-library Python 3) samples N
+prompts and runs them on M parallel instances of the example app, writing one
+**final screenshot per prompt** for manual verification:
 
-```bash
-EXE=path/to/agent_imgui_example KEY_FILE=path/to/key \
-    bash run_evals.sh 8 4          # sample 8 prompts, 4 in parallel
+```sh
+python run_evals.py 8 4 \
+    --exe path/to/agent_imgui_example --key-file path/to/key   # sample 8, 4 parallel
 ```
+
+Options may also come from the environment (`EXE`, `KEY_FILE`, `MODEL`,
+`TIMEOUT`, `PROMPTS_DIR`, `OUT`, `SEED`).
 
 Each run produces, in `OUT` (default `eval/out/`):
 
 ```
 out/
   007.png        # final screenshot of the UI after the agent acted
+  007.ops.json   # the ops the agent ran (a replayable program)
   007.log        # the run's stderr (tool calls, errors)
   007_input.md   # the prompt, copied alongside for easy comparison
+```
+
+Replay any recorded run in a window, at human speed, with no model call:
+
+```bash
+agent_imgui_example --replay out/007.ops.json
 ```
 
 Knobs (environment): `MODEL` (default `sonnet`), `TIMEOUT` (default 90s),

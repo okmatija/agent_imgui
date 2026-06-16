@@ -169,12 +169,24 @@ void TestRunner::Destroy() {
 
 void TestRunner::PostSwap() {
   if (!engine_ || !running_) return;
+  ImGuiTestEngineIO& io = ImGuiTestEngine_GetIO(engine_);
   {
     std::lock_guard<std::mutex> lk(mu_);
-    if (!jobs_.empty() && ImGuiTestEngine_IsTestQueueEmpty(engine_)) {
+    const bool queue_empty = ImGuiTestEngine_IsTestQueueEmpty(engine_);
+    if (!jobs_.empty() && queue_empty) {
       running_job_ = std::move(jobs_.front());
       jobs_.erase(jobs_.begin());
+      if (running_job_.run_speed >= 0) {
+        // Replay job: override the run speed (saving the current one to restore).
+        if (saved_speed_ < 0) saved_speed_ = static_cast<int>(io.ConfigRunSpeed);
+        io.ConfigRunSpeed =
+            static_cast<ImGuiTestRunSpeed>(running_job_.run_speed);
+      }
       ImGuiTestEngine_QueueTest(engine_, test_, ImGuiTestRunFlags_None);
+    } else if (jobs_.empty() && queue_empty && saved_speed_ >= 0) {
+      // A replay finished and nothing else is queued: restore the prior speed.
+      io.ConfigRunSpeed = static_cast<ImGuiTestRunSpeed>(saved_speed_);
+      saved_speed_ = -1;
     }
   }
   // Draw the simulated cursor while a program is running so the action is
@@ -217,16 +229,55 @@ void TestRunner::DrawPlaybackSettings() {
   ImGui::EndDisabled();
 }
 
-int TestRunner::Run(const std::string& json_args) {
+int TestRunner::Enqueue(const std::string& json_args, bool record,
+                        int run_speed) {
   std::string ops = ExtractOpsArray(json_args);
   if (ops.empty()) return 0;
   int count = 0;
-  ForEachObject(ops, [&](const std::string&) { ++count; });
+  std::vector<std::string> objs;
+  ForEachObject(ops, [&](const std::string& obj) {
+    ++count;
+    if (record) objs.push_back(obj);
+  });
   {
     std::lock_guard<std::mutex> lk(mu_);
-    jobs_.push_back(Job{/*gather=*/false, std::move(ops), nullptr});
+    if (record && recording_) {
+      for (auto& o : objs) recorded_.push_back(std::move(o));
+    }
+    jobs_.push_back(Job{/*gather=*/false, std::move(ops), nullptr, run_speed});
   }
   return count;
+}
+
+int TestRunner::Run(const std::string& json_args) {
+  return Enqueue(json_args, /*record=*/true, /*run_speed=*/-1);
+}
+
+int TestRunner::Replay(const std::string& json_args, Speed speed) {
+  int rs = ImGuiTestRunSpeed_Normal;
+  if (speed == Speed::kFast) {
+    rs = ImGuiTestRunSpeed_Fast;
+  } else if (speed == Speed::kCinematic) {
+    rs = ImGuiTestRunSpeed_Cinematic;
+  }
+  return Enqueue(json_args, /*record=*/false, /*run_speed=*/rs);
+}
+
+std::string TestRunner::GetRecording() {
+  std::lock_guard<std::mutex> lk(mu_);
+  if (recorded_.empty()) return "";
+  std::string out = "{\"ops\":[";
+  for (size_t i = 0; i < recorded_.size(); ++i) {
+    if (i) out += ",";
+    out += recorded_[i];
+  }
+  out += "]}";
+  return out;
+}
+
+void TestRunner::ClearRecording() {
+  std::lock_guard<std::mutex> lk(mu_);
+  recorded_.clear();
 }
 
 std::string TestRunner::Inspect() {
