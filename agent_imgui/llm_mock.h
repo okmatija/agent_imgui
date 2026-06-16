@@ -8,7 +8,7 @@
 
 #include "agent_imgui/llm_provider.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // A deterministic, offline provider. Used for headless GIF capture and when no
 // ANTHROPIC_API_KEY is set, so the UI plumbing (including the open_tool_window
@@ -52,6 +52,6 @@ class MockProvider : public LlmProvider {
   const char* name() const override { return "mock"; }
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_LLM_MOCK_H_

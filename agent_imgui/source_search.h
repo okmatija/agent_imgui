@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // Case-insensitive substring grep over the host application's C++ source tree (configured
 // at build time via AGENT_IMGUI_HOST_SOURCE_DIR) AND, if `extra_dir` is non-empty,
@@ -15,6 +15,6 @@ namespace mujoco::studio {
 std::string GrepSource(const std::string& pattern, const std::string& extra_dir,
                        int max_results);
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_SOURCE_SEARCH_H_

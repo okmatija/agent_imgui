@@ -12,7 +12,7 @@
 #define AGENT_IMGUI_HOST_SOURCE_DIR ""
 #endif
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 namespace fs = std::filesystem;
@@ -87,4 +87,4 @@ std::string GrepSource(const std::string& pattern, const std::string& extra_dir,
   return out;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui

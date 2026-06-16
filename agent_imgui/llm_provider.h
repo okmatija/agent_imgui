@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // One turn in the conversation. `role` is "user" or "assistant".
 struct LlmMessage {
@@ -74,6 +74,6 @@ class LlmProvider {
   virtual std::string Model() const { return ""; }
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_LLM_PROVIDER_H_

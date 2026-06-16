@@ -11,7 +11,7 @@ struct ImGuiTestEngine;
 struct ImGuiTest;
 struct ImGuiTestContext;
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // Owns the Dear ImGui Test Engine and runs LLM-authored UI programs through it.
 //
@@ -91,6 +91,6 @@ class TestRunner {
   Job running_job_;        // the job the currently-queued test is executing
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_TEST_RUNNER_H_

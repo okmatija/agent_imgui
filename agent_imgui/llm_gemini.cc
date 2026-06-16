@@ -10,7 +10,7 @@
 
 #include "agent_imgui/llm_provider.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 constexpr int kMaxToolIterations = 20;
@@ -270,11 +270,11 @@ std::string GeminiProvider::SetModel(const std::string& id_or_alias) {
   return id;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 // ---------------------------------------------------------------------------
 // Platform transport + the tool-use loop, isolated so <windows.h> stays out of
-// the rest of the studio sources (mirrors llm_claude.cc).
+// the rest of the sources (mirrors llm_claude.cc).
 // ---------------------------------------------------------------------------
 
 #ifdef _WIN32
@@ -284,7 +284,7 @@ std::string GeminiProvider::SetModel(const std::string& id_or_alias) {
 #include <windows.h>
 #include <winhttp.h>
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 std::wstring Widen(const std::string& s) {
@@ -301,7 +301,7 @@ bool HttpsPost(const std::string& host, const std::string& path,
   response.clear();
   err.clear();
 
-  HINTERNET session = WinHttpOpen(L"MuJoCoStudio/1.0",
+  HINTERNET session = WinHttpOpen(L"agent_imgui/1.0",
                                   WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS,
                                   0);
@@ -478,11 +478,11 @@ LlmResult GeminiProvider::Send(const std::string& system,
   return r;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #else  // !_WIN32
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 LlmResult GeminiProvider::Send(const std::string& /*system*/,
                                const std::vector<LlmMessage>& /*messages*/,
@@ -496,6 +496,6 @@ LlmResult GeminiProvider::Send(const std::string& /*system*/,
   return r;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // _WIN32

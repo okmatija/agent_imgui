@@ -15,7 +15,7 @@
 #include "imgui_test_engine/imgui_te_context.h"
 #include "imgui_test_engine/imgui_te_engine.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 // --- Tiny JSON readers (the op-program is a constrained shape we control). ---
@@ -146,7 +146,7 @@ void TestRunner::Start() {
   ImGuiTestEngine_Start(engine_, ImGui::GetCurrentContext());
   ImGuiTestEngine_InstallDefaultCrashHandler();
 
-  test_ = ImGuiTestEngine_RegisterTest(engine_, "studio", "run_program",
+  test_ = ImGuiTestEngine_RegisterTest(engine_, "agent_imgui", "run_program",
                                        __FILE__, __LINE__);
   test_->UserData = this;
   test_->TestFunc = &TestRunner::TestFuncThunk;
@@ -491,4 +491,4 @@ void TestRunner::DoGather(ImGuiTestContext* ctx,
   }
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui

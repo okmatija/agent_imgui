@@ -60,14 +60,11 @@ Then, from the host code:
 #include "agent_imgui/ui_agent.h"
 #include "agent_imgui/llm_panel.h"
 
-mujoco::studio::UiAgent agent;     // ClaudeProvider if ANTHROPIC_API_KEY is set,
-mujoco::studio::LlmPanel panel;    // otherwise MockProvider.
+agent_imgui::UiAgent agent;     // ClaudeProvider if ANTHROPIC_API_KEY is set,
+agent_imgui::LlmPanel panel;    // otherwise MockProvider.
 // each frame: agent.Poll();  panel.Render(agent);
 // on submit:  agent.Ask(user_text);
 ```
-
-> Note: the public symbols are still in the `mujoco::studio` namespace from the
-> original extraction.
 
 ## Configuration
 

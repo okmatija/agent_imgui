@@ -20,7 +20,7 @@
 #define AGENT_IMGUI_SOURCE_DIR ""
 #endif
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 std::string ReadFile(const std::string& path) {
@@ -48,10 +48,10 @@ std::string LoadSystemPrompt() {
     }
   }
   return
-      "You are an AI assistant embedded in MuJoCo Studio. Act on the UI only by "
-      "calling run_ui_program (it drives the real widgets via the ImGui Test "
-      "Engine). Use model_info for joint/actuator/body names and grep_source for "
-      "source-level ids; do not invent refs. Keep replies to one short sentence.";
+      "You are an AI assistant embedded in a Dear ImGui application. Act on the "
+      "UI only by calling run_ui_program (it drives the real widgets via the "
+      "ImGui Test Engine). Use grep_source for source-level ids; do not invent "
+      "refs. Keep replies to one short sentence.";
 }
 
 }  // namespace
@@ -306,4 +306,4 @@ void UiAgent::Poll() {
   pending_.reset();
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui

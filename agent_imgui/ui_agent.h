@@ -11,7 +11,7 @@
 
 #include "agent_imgui/llm_provider.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // Routes plain-English command-prompt input to an LLM and keeps the running
 // conversation. Networking happens on a detached worker thread; the UI thread
@@ -122,6 +122,6 @@ class UiAgent {
   std::shared_ptr<Pending> pending_;
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_UI_AGENT_H_

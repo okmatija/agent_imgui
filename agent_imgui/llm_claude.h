@@ -7,7 +7,7 @@
 
 #include "agent_imgui/llm_provider.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // Talks to the Anthropic Messages API (POST /v1/messages). Defaults to model
 // claude-sonnet-4-6 (switchable at runtime via SetModel / the "/model" command).
@@ -50,6 +50,6 @@ class ClaudeProvider : public LlmProvider {
   int max_tokens_ = 8192;
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_LLM_CLAUDE_H_

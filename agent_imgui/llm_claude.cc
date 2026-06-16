@@ -10,7 +10,7 @@
 
 #include "agent_imgui/llm_provider.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 constexpr int kMaxToolIterations = 20;
@@ -323,11 +323,11 @@ std::string ClaudeProvider::SetModel(const std::string& id_or_alias) {
   return id;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 // ---------------------------------------------------------------------------
 // Platform transport + the tool-use loop. Kept at the bottom and isolated so
-// <windows.h> never bleeds into the rest of the studio sources.
+// <windows.h> never bleeds into the rest of the sources.
 // ---------------------------------------------------------------------------
 
 #ifdef _WIN32
@@ -337,7 +337,7 @@ std::string ClaudeProvider::SetModel(const std::string& id_or_alias) {
 #include <windows.h>
 #include <winhttp.h>
 
-namespace mujoco::studio {
+namespace agent_imgui {
 namespace {
 
 std::wstring Widen(const std::string& s) {
@@ -353,7 +353,7 @@ bool HttpsPost(const std::string& headers, const std::string& body,
   response.clear();
   err.clear();
 
-  HINTERNET session = WinHttpOpen(L"MuJoCoStudio/1.0",
+  HINTERNET session = WinHttpOpen(L"agent_imgui/1.0",
                                   WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS,
                                   0);
@@ -537,11 +537,11 @@ LlmResult ClaudeProvider::Send(const std::string& system,
   return r;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #else  // !_WIN32
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 LlmResult ClaudeProvider::Send(const std::string& /*system*/,
                                const std::vector<LlmMessage>& /*messages*/,
@@ -555,6 +555,6 @@ LlmResult ClaudeProvider::Send(const std::string& /*system*/,
   return r;
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // _WIN32

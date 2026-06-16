@@ -7,7 +7,7 @@
 
 #include "agent_imgui/llm_provider.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 // Talks to the Google Gemini API (generativelanguage.googleapis.com,
 // :generateContent) with function calling, mirroring ClaudeProvider's own
@@ -45,6 +45,6 @@ class GeminiProvider : public LlmProvider {
   int max_tokens_ = 8192;
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_LLM_GEMINI_H_

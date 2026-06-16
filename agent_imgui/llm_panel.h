@@ -1,7 +1,7 @@
 #ifndef AGENT_IMGUI_LLM_PANEL_H_
 #define AGENT_IMGUI_LLM_PANEL_H_
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 class UiAgent;
 
@@ -20,6 +20,6 @@ class LlmPanel {
   bool scroll_to_bottom_ = false;  // one-shot jump after a new turn arrives.
 };
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
 
 #endif  // AGENT_IMGUI_LLM_PANEL_H_

@@ -1,6 +1,5 @@
 # agent_imgui — an LLM "agent in your Dear ImGui app" library.
-# Originally extracted from MuJoCo Studio (src/experimental/studio/llm). See
-# README.md for how to consume it.
+# See README.md for how to consume it.
 
 cmake_minimum_required(VERSION 3.16)
 

@@ -9,7 +9,7 @@
 
 #include "agent_imgui/ui_agent.h"
 
-namespace mujoco::studio {
+namespace agent_imgui {
 
 namespace {
 // Characters revealed per frame for the typewriter effect.
@@ -125,4 +125,4 @@ void LlmPanel::Render(UiAgent& agent) {
   ImGui::EndChild();
 }
 
-}  // namespace mujoco::studio
+}  // namespace agent_imgui
