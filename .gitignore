@@ -1,0 +1,7 @@
+# Build trees
+build/
+out/
+cmake-build-*/
+
+# Transient capture frames
+.frames_*/
