@@ -9,8 +9,8 @@
 //     --window           interactive window (default)
 //
 // In windowed / screenshot mode the agent can act on the Dear ImGui demo window
-// through the ImGui Test Engine (run_ui_program), inspect it (inspect_ui), and
-// grab a screenshot for itself (the multimodal `screenshot` tool).
+// through the ImGui Test Engine (tool_run_ui_program), inspect it
+// (tool_inspect_ui), and grab a screenshot for itself (tool_screenshot).
 
 #include <atomic>
 #include <chrono>
@@ -32,6 +32,10 @@
 #include "agent_imgui/test_runner.h"
 #include "agent_imgui/ui_agent.h"
 
+#include "tool_inspect_ui.h"
+#include "tool_run_ui_program.h"
+#include "tool_screenshot.h"
+
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>  // for SDL_SetMainReady (SDL.h does not include this)
@@ -44,6 +48,14 @@
 #include "stb_image_write.h"
 
 namespace {
+
+using example::CaptureBridge;
+using example::InspectUiToolDef;
+using example::RunInspectUiTool;
+using example::RunScreenshotTool;
+using example::RunUiProgramTool;
+using example::RunUiProgramToolDef;
+using example::ScreenshotToolDef;
 
 // ---------------------------------------------------------------------------
 // Small utilities
@@ -71,32 +83,6 @@ std::string Trim(const std::string& s) {
   return s.substr(b, e - b + 1);
 }
 
-std::string Base64(const std::string& in) {
-  static const char* t =
-      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  std::string out;
-  out.reserve(((in.size() + 2) / 3) * 4);
-  auto uc = [](char c) { return static_cast<unsigned>(static_cast<unsigned char>(c)); };
-  size_t i = 0;
-  for (; i + 2 < in.size(); i += 3) {
-    const unsigned v = (uc(in[i]) << 16) | (uc(in[i + 1]) << 8) | uc(in[i + 2]);
-    out += t[(v >> 18) & 63];
-    out += t[(v >> 12) & 63];
-    out += t[(v >> 6) & 63];
-    out += t[v & 63];
-  }
-  if (i < in.size()) {
-    const bool two = (i + 1 < in.size());
-    unsigned v = uc(in[i]) << 16;
-    if (two) v |= uc(in[i + 1]) << 8;
-    out += t[(v >> 18) & 63];
-    out += t[(v >> 12) & 63];
-    out += two ? t[(v >> 6) & 63] : '=';
-    out += '=';
-  }
-  return out;
-}
-
 void SetEnvIfUnset(const char* key, const std::string& value) {
 #if defined(_WIN32)
   if (!std::getenv(key)) _putenv_s(key, value.c_str());
@@ -110,19 +96,21 @@ void SetEnvIfUnset(const char* key, const std::string& value) {
 const char* kDemoSystemPrompt =
     "You are an agent embedded in a Dear ImGui application. The main window on "
     "screen is the \"Dear ImGui Demo\" window, which showcases many widgets.\n\n"
-    "You act on the UI ONLY by calling run_ui_program: a JSON program of Dear "
-    "ImGui Test Engine operations that click/drag/type the real widgets. "
+    "You act on the UI ONLY by calling tool_run_ui_program: a JSON program of "
+    "Dear ImGui Test Engine operations that click/drag/type the real widgets. "
     "Reference items by their ImGui path, e.g. \"//Dear ImGui Demo/Widgets\" or "
     "\"//Dear ImGui Demo/Configuration\". A tree node or header must be opened "
     "(op item_open, or item_click) before its children are reachable.\n\n"
     "Tools:\n"
-    "- inspect_ui: lists the items currently on screen with labels/ids. Use it "
-    "to discover exact item paths before referencing them.\n"
-    "- run_ui_program: performs the actions.\n"
-    "- screenshot: returns an image of the current UI. Use it SPARINGLY, only "
-    "when you must visually confirm a result you cannot verify from inspect_ui.\n\n"
-    "Work in small steps: open the relevant section, inspect_ui to find the "
-    "exact item, then run_ui_program. Keep replies to one short sentence.";
+    "- tool_inspect_ui: lists the items currently on screen with labels/ids. Use "
+    "it to discover exact item paths before referencing them.\n"
+    "- tool_run_ui_program: performs the actions.\n"
+    "- tool_screenshot: returns an image of the current UI. You MUST use it when "
+    "the request needs information that is on screen but NOT in the "
+    "tool_inspect_ui result (colours, plots, images, rendered shapes, layout); "
+    "otherwise do not screenshot routinely.\n\n"
+    "Work in small steps: open the relevant section, tool_inspect_ui to find the "
+    "exact item, then tool_run_ui_program. Keep replies to one short sentence.";
 
 // ---------------------------------------------------------------------------
 // Arguments
@@ -349,96 +337,22 @@ struct Renderer {
   }
 };
 
-// Hand-off so the worker-thread `screenshot` tool gets a frame captured by the
-// render thread (capture must happen on the thread that owns the GPU device).
-struct CaptureBridge {
-  std::mutex mu;
-  std::condition_variable cv;
-  bool requested = false;
-  bool done = false;
-  std::string png;
-};
-
 // ---------------------------------------------------------------------------
-// Tools
+// Tools. Each tool lives in its own tool_*.{h,cc}; here we just wire them up.
 // ---------------------------------------------------------------------------
-
-const char* kRunProgramSchema =
-    "{\"type\":\"object\",\"properties\":{\"ops\":{\"type\":\"array\",\"items\":"
-    "{\"type\":\"object\",\"properties\":{"
-    "\"op\":{\"type\":\"string\",\"enum\":[\"item_click\",\"click_id\","
-    "\"right_click\",\"double_click\",\"item_check\",\"item_uncheck\","
-    "\"item_open\",\"item_close\",\"set_float\",\"set_int\",\"set_text\","
-    "\"combo_select\",\"menu_click\",\"scroll\",\"hover\",\"key_chars\","
-    "\"key_press\",\"wait\"]},"
-    "\"ref\":{\"type\":\"string\",\"description\":\"ImGui item path, e.g. "
-    "//Dear ImGui Demo/Widgets\"},"
-    "\"id\":{\"type\":\"number\"},"
-    "\"path\":{\"type\":\"string\",\"description\":\"menu path for menu_click\"},"
-    "\"value\":{\"description\":\"number for set_float/set_int, or option text "
-    "for combo_select\"},"
-    "\"text\":{\"type\":\"string\"},\"key\":{\"type\":\"string\"},"
-    "\"to\":{\"type\":\"string\"},\"seconds\":{\"type\":\"number\"}},"
-    "\"required\":[\"op\"]}}},\"required\":[\"ops\"]}";
 
 void RegisterTools(agent_imgui::UiAgent& agent, agent_imgui::TestRunner& runner,
                    CaptureBridge& bridge) {
-  using agent_imgui::ToolDef;
-  using agent_imgui::ToolImage;
-  using agent_imgui::ToolResult;
-
-  ToolDef inspect_ui{
-      "inspect_ui",
-      "Lists the widgets currently visible on screen, grouped by window, with "
-      "their labels and ids. Call it to find exact item paths. No arguments.",
-      "{\"type\":\"object\",\"properties\":{},\"required\":[]}"};
-
-  ToolDef run_program{
-      "run_ui_program",
-      "Drive the UI by running a short program of Dear ImGui Test Engine "
-      "operations -- this clicks/drags/types the real widgets. Reference items "
-      "by their ImGui path (e.g. //Dear ImGui Demo/Widgets). Open a tree "
-      "node/header before touching its children.",
-      kRunProgramSchema};
-
-  ToolDef screenshot{
-      "screenshot",
-      "Returns a PNG screenshot of the current UI for you to look at. Use "
-      "SPARINGLY -- only when you must visually confirm something you cannot "
-      "verify with inspect_ui. No arguments.",
-      "{\"type\":\"object\",\"properties\":{},\"required\":[]}"};
-
-  auto exec = [&runner, &bridge](const std::string& name,
-                                 const std::string& json_args) -> ToolResult {
-    if (name == "inspect_ui") return runner.Inspect();
-    if (name == "run_ui_program") {
-      const int n = runner.Run(json_args);
-      return "Queued a " + std::to_string(n) + "-op UI program.";
-    }
-    if (name == "screenshot") {
-      std::string png;
-      {
-        std::unique_lock<std::mutex> lk(bridge.mu);
-        bridge.requested = true;
-        bridge.done = false;
-        bridge.png.clear();
-        if (!bridge.cv.wait_for(lk, std::chrono::seconds(20),
-                                [&] { return bridge.done; })) {
-          bridge.requested = false;
-          return "Screenshot timed out.";
-        }
-        png = std::move(bridge.png);
-      }
-      if (png.empty()) return "Screenshot failed.";
-      ToolResult r;
-      r.text = "Screenshot of the current UI (PNG attached).";
-      r.images.push_back(ToolImage{"image/png", Base64(png)});
-      return r;
-    }
+  auto exec = [&runner, &bridge](
+                  const std::string& name,
+                  const std::string& json_args) -> agent_imgui::ToolResult {
+    if (name == "tool_inspect_ui") return RunInspectUiTool(runner, json_args);
+    if (name == "tool_run_ui_program") return RunUiProgramTool(runner, json_args);
+    if (name == "tool_screenshot") return RunScreenshotTool(bridge, json_args);
     return "Unknown tool: " + name;
   };
-
-  agent.set_tools({inspect_ui, run_program, screenshot}, exec);
+  agent.set_tools(
+      {InspectUiToolDef(), RunUiProgramToolDef(), ScreenshotToolDef()}, exec);
 }
 
 // Services a pending screenshot-tool request once the UI has settled.

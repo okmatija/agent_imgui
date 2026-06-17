@@ -229,7 +229,8 @@ the top-level project, OFF when embedded). Integrators who just link the
 `agent_imgui` library can ignore this whole directory.
 
 It shows a full-screen Dear ImGui demo window and an "Agent" panel you can chat
-in, wires up the agent's UI tools (`inspect_ui`, `run_ui_program`, `screenshot`),
+in, wires up the agent's UI tools (`tool_inspect_ui`, `tool_run_ui_program`,
+`tool_screenshot`),
 and can run the agent headless. Build it (standalone build does so automatically,
 fetching SDL3, Dear ImGui and the Test Engine):
 

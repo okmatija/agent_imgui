@@ -37,6 +37,12 @@ endif()
 # The ImGui SDL3 + SDL_GPU backends are compiled straight into the example.
 add_executable(agent_imgui_example
     main.cc
+    tool_inspect_ui.cc
+    tool_inspect_ui.h
+    tool_run_ui_program.cc
+    tool_run_ui_program.h
+    tool_screenshot.cc
+    tool_screenshot.h
     ${AGENT_IMGUI_IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
     ${AGENT_IMGUI_IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp
 )
