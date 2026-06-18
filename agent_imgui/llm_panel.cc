@@ -49,7 +49,11 @@ void LlmPanel::Render(UiAgent& agent) {
   // whole conversation stays reachable by scrolling up.
   const float max_h = ImGui::GetMainViewport()->WorkSize.y * 0.5f;
   ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(FLT_MAX, max_h));
-  if (ImGui::BeginChild("##convo", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY)) {
+  // AlwaysUseWindowPadding so the transcript isn't flush with the child border
+  // (non-bordered children have no padding by default).
+  if (ImGui::BeginChild(
+          "##convo", ImVec2(0, 0),
+          ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding)) {
     for (int i = 0; i < n; ++i) {
       const UiAgent::Turn& turn = history[i];
       const bool is_user = (turn.role == "user");
