@@ -103,11 +103,17 @@ void LlmPanel::Render(UiAgent& agent) {
       }
       const int dots = 1 + (static_cast<int>(ImGui::GetTime() * 3.0) % 3);
       ImGui::TextDisabled("thinking%s", std::string(dots, '.').c_str());
-      // Cancel pushed to the right edge of the conversation panel.
+      // Cancel pushed to the right edge of the conversation panel. Positioned
+      // via GetContentRegionAvail (which respects the child's window padding);
+      // the obsolete GetContentRegionMax did not, leaving it flush.
       const char* kCancel = "Cancel";
       const float button_w = ImGui::CalcTextSize(kCancel).x +
                              ImGui::GetStyle().FramePadding.x * 2.0f;
-      ImGui::SameLine(ImGui::GetContentRegionMax().x - button_w);
+      ImGui::SameLine();
+      const float avail = ImGui::GetContentRegionAvail().x;
+      if (avail > button_w) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - button_w);
+      }
       if (ImGui::SmallButton(kCancel)) {
         agent.Cancel();
       }
